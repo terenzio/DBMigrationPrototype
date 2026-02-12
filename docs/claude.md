@@ -1,11 +1,12 @@
 
 ```mermaid
 erDiagram
+    %% Product Suite
     PRODUCT_SUITES_INFO {
         VARCHAR PROD_SUITE_ID PK "Primary Key"
         VARCHAR PROD_SUITE_NAME ""
         VARCHAR PROD_SUITE_OWNER_NT_ACCT ""
-        VARCHAR PROD_SUITE_SITE_OWNER_ACCT ""        
+        VARCHAR PROD_SUITE_SITE_OWNER_ACCT ""
         VARCHAR DIVISION ""
     }
 
@@ -13,9 +14,10 @@ erDiagram
         VARCHAR PROD_SUITE_CONFIG_ID PK "Primary Key"
         VARCHAR PROD_SUITE_ID FK "References"
         VARCHAR PROD_SUITE_CONFIG_PARAM ""
-        VARCHAR PROD_SUITE_CONFIG_VAL "" 
+        VARCHAR PROD_SUITE_CONFIG_VAL ""
     }
 
+    %% Product
     PRODUCT_INFO {
         VARCHAR PROD_ID PK ""
         VARCHAR PROD_NAME ""
@@ -36,6 +38,17 @@ erDiagram
         VARCHAR PROD_CONFIG_VAL ""
     }
 
+    ROLE_MAP {
+        VARCHAR ID PK "Primary Key"
+        VARCHAR PROD_ID FK "References"
+        VARCHAR SITE ""
+        VARCHAR ACCT ""
+        VARCHAR TYPE ""
+        VARCHAR ORG_CODE ""
+        VARCHAR ROLE_NAME ""
+    }
+
+    %% Release Unit
     RELEASE_UNIT_INFO {
         VARCHAR AP_ID PK "Primary Key"
         VARCHAR PROD_ID FK "References"
@@ -50,14 +63,7 @@ erDiagram
         VARCHAR AP_CONFIG_VAL ""
     }
 
-    PRODUCT_SUITES_INFO ||--o{ PRODUCT_SUITE_CONFIG : "configures"
-    PRODUCT_SUITES_INFO ||--o{ PRODUCT_INFO : "has"
-    PRODUCT_INFO ||--o{ PRODUCT_CONFIG : "has config"
-    PRODUCT_INFO ||--o{ RELEASE_UNIT_INFO : "contains"
-    RELEASE_UNIT_INFO ||--o{ RELEASE_UNIT_CONFIG : "has config"
-    RP_MAP ||--o{ RELEASE_UNIT_INFO : "mapped to"
-    PAAS_DEPLOY_UNIT }o--|| RELEASE_UNIT_INFO : "deployed"
-
+    %% Deployment & Mapping
     RP_MAP {
         VARCHAR RU_ID PK,FK "References"
         VARCHAR RP_ID PK,FK "References"
@@ -67,4 +73,14 @@ erDiagram
         VARCHAR UNIT_ID PK "Primary Key"
         VARCHAR AP_ID FK "References"
     }
+
+    %% Relationships
+    PRODUCT_SUITES_INFO ||--o{ PRODUCT_SUITE_CONFIG : "configures"
+    PRODUCT_SUITES_INFO ||--o{ PRODUCT_INFO : "has"
+    PRODUCT_INFO ||--o{ PRODUCT_CONFIG : "has config"
+    PRODUCT_INFO ||--o{ ROLE_MAP : "has_roles"
+    PRODUCT_INFO ||--o{ RELEASE_UNIT_INFO : "contains"
+    RELEASE_UNIT_INFO ||--o{ RELEASE_UNIT_CONFIG : "has config"
+    RP_MAP ||--o{ RELEASE_UNIT_INFO : "mapped to"
+    PAAS_DEPLOY_UNIT }o--|| RELEASE_UNIT_INFO : "deployed"
 ```

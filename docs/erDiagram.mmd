@@ -48,8 +48,31 @@ erDiagram
         VARCHAR AP_CONFIG_VAL ""
     }
 
+    ROLE_MAP {
+        VARCHAR ID PK "Primary Key"
+        VARCHAR PROD_ID FK "References"
+        VARCHAR SITE ""
+        VARCHAR ACCT ""
+        VARCHAR TYPE ""
+        VARCHAR ORG_CODE ""
+        VARCHAR ROLE_NAME ""
+    }
+
     PRODUCT_SUITES_INFO ||--o{ PRODUCT_SUITE_CONFIG : "configures"
     PRODUCT_SUITES_INFO ||--o{ PRODUCT_INFO : "has"
+    PRODUCT_INFO ||--o{ ROLE_MAP : "has_roles"
     PRODUCT_INFO ||--o{ PRODUCT_CONFIG : "has config"
     PRODUCT_INFO ||--o{ RELEASE_UNIT_INFO : "contains"
     RELEASE_UNIT_INFO ||--o{ RELEASE_UNIT_CONFIG : "has config"
+    RP_MAP ||--o{ RELEASE_UNIT_INFO : "mapped to"
+    PAAS_DEPLOY_UNIT }o--|| RELEASE_UNIT_INFO : "deployed"
+
+    RP_MAP {
+        VARCHAR RU_ID PK,FK "References"
+        VARCHAR RP_ID PK,FK "References"
+    }
+
+    PAAS_DEPLOY_UNIT {
+        VARCHAR UNIT_ID PK "Primary Key"
+        VARCHAR AP_ID FK "References"
+    }

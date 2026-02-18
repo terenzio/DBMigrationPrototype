@@ -1,7 +1,40 @@
 
 ```mermaid
 erDiagram
-    %% Product Suite
+
+    %% =============================================
+    %% Relationships
+    %% =============================================
+
+    %% Product Suite relationships
+    PRODUCT_SUITES_INFO ||--o{ PRODUCT_INFO : "has"
+    PRODUCT_SUITES_INFO ||--o{ PRODUCT_SUITE_CONFIG : "configures"
+
+    %% Product relationships
+    PRODUCT_INFO ||--o{ ROLE_MAP : "has_roles"
+    PRODUCT_INFO ||--o{ PRODUCT_CONFIG : "has config"
+    PRODUCT_INFO ||--o{ RELEASE_UNIT_INFO : "contains"
+
+    %% Release Unit relationships
+    RELEASE_UNIT_INFO ||--o{ RELEASE_UNIT_CONFIG : "has config"
+    RELEASE_UNIT_INFO }o--|| RP_MAP : "mapped to"
+    RELEASE_UNIT_INFO ||--o{ PAAS_DEPLOY_UNIT : "deployed"
+    RELEASE_UNIT_INFO ||--o{ PAAS_RLSE_INFO : "has release info"
+
+    %% Release Product and Package relationships
+    RELEASE_PRODUCT_INFO ||--o{ RP_MAP : "mapped to"
+    release_packages ||--o{ rp_ru_mapping : "contains"
+    rp_ru_mapping }o--|| RELEASE_UNIT_INFO : "maps to"
+
+    %% PaaS relationships
+    PAAS_DEPLOY_UNIT ||--o{ PAAS_DEPLOY_STATUS : "has status"
+
+    %% =============================================
+    %% Entity Definitions
+    %% =============================================
+
+    %% ----- Product Suite Entities -----
+
     PRODUCT_SUITES_INFO {
         VARCHAR PROD_SUITE_ID PK "Primary Key"
         VARCHAR PROD_SUITE_NAME ""
@@ -21,7 +54,8 @@ erDiagram
         DATETIME UPDATED_AT ""
     }
 
-    %% Product
+    %% ----- Product Entities -----
+
     PRODUCT_INFO {
         VARCHAR PROD_ID PK ""
         VARCHAR PROD_NAME ""
@@ -56,7 +90,8 @@ erDiagram
         DATETIME UPDATED_AT ""
     }
 
-    %% Release Unit
+    %% ----- Release Unit Entities -----
+
     RELEASE_UNIT_INFO {
         VARCHAR AP_ID PK "Primary Key"
         VARCHAR PROD_ID FK "References"
@@ -75,7 +110,8 @@ erDiagram
         DATETIME UPDATED_AT ""
     }
 
-    %% Release Product
+    %% ----- Release Product / Package Entities -----
+
     RELEASE_PRODUCT_INFO {
         VARCHAR RP_ID PK "Primary Key"
         VARCHAR RP_NAME ""
@@ -84,7 +120,6 @@ erDiagram
         DATETIME UPDATED_AT ""
     }
 
-    %% Deployment & Mapping
     RP_MAP {
         VARCHAR RU_ID PK,FK "References RELEASE_UNIT_INFO"
         VARCHAR RP_ID PK,FK "References RELEASE_PRODUCT_INFO"
@@ -92,21 +127,12 @@ erDiagram
         DATETIME UPDATED_AT ""
     }
 
+    %% ----- PaaS Entities -----
+
     PAAS_DEPLOY_UNIT {
         VARCHAR UNIT_ID PK "Primary Key"
         VARCHAR AP_ID FK "References"
         DATETIME CREATED_AT ""
         DATETIME UPDATED_AT ""
     }
-
-    %% Relationships
-    PRODUCT_SUITES_INFO ||--o{ PRODUCT_SUITE_CONFIG : "configures"
-    PRODUCT_SUITES_INFO ||--o{ PRODUCT_INFO : "has"
-    PRODUCT_INFO ||--o{ PRODUCT_CONFIG : "has config"
-    PRODUCT_INFO ||--o{ ROLE_MAP : "has_roles"
-    PRODUCT_INFO ||--o{ RELEASE_UNIT_INFO : "contains"
-    RELEASE_UNIT_INFO ||--o{ RELEASE_UNIT_CONFIG : "has config"
-    RELEASE_UNIT_INFO ||--o{ RP_MAP : "mapped to"
-    RELEASE_PRODUCT_INFO ||--o{ RP_MAP : "mapped to"
-    PAAS_DEPLOY_UNIT }o--|| RELEASE_UNIT_INFO : "deployed"
 ```

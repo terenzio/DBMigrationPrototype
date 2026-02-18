@@ -18,9 +18,9 @@ RUN go build -o /app/server main.go
 # ---- Runtime stage ----
 FROM oraclelinux:8-slim
 
-RUN dnf install -y oracle-instantclient-release-23ai-el8 && \
-    dnf install -y oracle-instantclient-basic && \
-    dnf clean all
+RUN microdnf install -y oracle-instantclient-release-23ai-el8 && \
+    microdnf install -y oracle-instantclient-basic && \
+    microdnf clean all
 
 ENV LD_LIBRARY_PATH=/usr/lib/oracle/23.7/client64/lib
 

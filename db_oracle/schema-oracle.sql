@@ -2,6 +2,11 @@
 -- Compatible with Oracle 12c+
 -- Tables are created in dependency order (parents before children)
 
+-- Switch to the pluggable database and create tables under SYSTEM schema
+-- (init scripts run as SYS, but the backend connects as SYSTEM)
+ALTER SESSION SET CONTAINER = XEPDB1;
+ALTER SESSION SET CURRENT_SCHEMA = SYSTEM;
+
 -- ============================================================
 -- Product Suite
 -- ============================================================

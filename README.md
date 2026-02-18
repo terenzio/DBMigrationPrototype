@@ -121,17 +121,17 @@ HTTP Request
     │
     ▼
 ┌──────────┐     Binds JSON, validates input, returns HTTP response
-│  Handler  │
+│  Handler │
 └────┬─────┘
      │
      ▼
 ┌──────────┐     Generates UUID, maps DTO to domain model
-│  Service  │
+│  Service │
 └────┬─────┘
      │
      ▼
 ┌──────────┐     Executes SQL against Oracle via godror driver
-│Repository │
+│Repository│
 └────┬─────┘
      │
      ▼

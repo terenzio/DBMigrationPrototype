@@ -6,7 +6,7 @@ A prototype project demonstrating an Oracle-to-MariaDB database migration strate
 
 ```text
 DBMigrationPrototype/
-├── docker-compose.yml              # Orchestrates Oracle XE + Go backend
+├── docker-compose.yml              # Orchestrates Oracle XE + MariaDB + Go backend
 ├── backend/                        # Go service (GIN framework)
 │   ├── Dockerfile                  # Multi-stage build with Oracle Instant Client
 │   ├── go.mod / go.sum
@@ -52,9 +52,10 @@ docker-compose up --build
 
 This will:
 
-- Pull the `gvenzl/oracle-xe:21-slim` image (first run only)
+- Pull the `gvenzl/oracle-xe:21-slim` and `mariadb:11` images (first run only)
 - Initialize the Oracle XE database and execute `db_oracle/schema-oracle.sql` to create all tables
-- Populate all 14 tables with sample data via `db_oracle/seed-data.sql` (2 rows per table)
+- Populate all 14 Oracle tables with sample data via `db_oracle/seed-data.sql` (2 rows per table)
+- Initialize the MariaDB database and execute `db_mariaDB/schema-mariadb.sql` to create all 14 empty tables
 - Build the Go backend with Oracle Instant Client
 - Start the backend on port `8080` once Oracle is healthy
 
@@ -140,6 +141,30 @@ HTTP Request
   Oracle XE
 ```
 
+## Database Connections
+
+### Oracle XE
+
+| Field    | Value     |
+| -------- | --------- |
+| Host     | `localhost` |
+| Port     | `1521`    |
+| Service  | `XEPDB1`  |
+| Username | `system`  |
+| Password | `oracle`  |
+
+### MariaDB
+
+| Field    | Value          |
+| -------- | -------------- |
+| Host     | `localhost`    |
+| Port     | `3306`         |
+| Database | `migration_db` |
+| Username | `mariadb`      |
+| Password | `mariadb`      |
+
+> Root password for MariaDB is also `mariadb`.
+
 ## Environment Variables
 
 The backend reads these environment variables (all have defaults for Docker Compose):
@@ -161,13 +186,13 @@ The backend reads these environment variables (all have defaults for Docker Comp
 docker-compose down
 ```
 
-### Stop and reset the database (wipe all data)
+### Stop and reset the databases (wipe all data)
 
 ```bash
 docker-compose down -v
 ```
 
-The `-v` flag removes the `oracle-data` volume. On the next `docker-compose up`, Oracle will reinitialize and re-run the schema SQL.
+The `-v` flag removes the `oracle-data` and `mariadb-data` volumes. On the next `docker-compose up`, both databases will reinitialize and re-run their schema SQL.
 
 ### Rebuild after code changes
 
@@ -186,6 +211,9 @@ docker-compose logs -f backend
 
 # Oracle only
 docker-compose logs -f oracle-xe
+
+# MariaDB only
+docker-compose logs -f mariadb
 ```
 
 ## Documentation

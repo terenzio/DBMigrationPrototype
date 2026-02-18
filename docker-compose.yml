@@ -19,6 +19,26 @@ services:
       retries: 10
       start_period: 120s
 
+  mariadb:
+    image: mariadb:11
+    container_name: mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: mariadb
+      MARIADB_DATABASE: migration_db
+      MARIADB_USER: mariadb
+      MARIADB_PASSWORD: mariadb
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+      - ./db_mariaDB/schema-mariadb.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   backend:
     build:
       context: ./backend
@@ -40,3 +60,4 @@ services:
 
 volumes:
   oracle-data:
+  mariadb-data:

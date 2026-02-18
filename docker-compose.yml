@@ -11,6 +11,7 @@ services:
     volumes:
       - oracle-data:/opt/oracle/oradata
       - ./db_oracle/schema-oracle.sql:/container-entrypoint-initdb.d/01-schema.sql
+      - ./db_oracle/seed-data.sql:/container-entrypoint-initdb.d/02-seed-data.sql
     healthcheck:
       test: ["CMD", "healthcheck.sh"]
       interval: 30s

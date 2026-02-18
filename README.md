@@ -19,7 +19,8 @@ DBMigrationPrototype/
 │       ├── repository/             # Data access (Oracle via godror)
 │       └── router/router.go       # Route definitions
 ├── db_oracle/
-│   └── schema-oracle.sql          # Oracle DDL (auto-loaded by Docker)
+│   ├── schema-oracle.sql          # Oracle DDL (auto-loaded by Docker)
+│   └── seed-data.sql              # Sample data (2 rows per table, auto-loaded)
 ├── db_mariaDB/
 │   └── schema-mariadb.sql         # MariaDB DDL
 └── docs/
@@ -53,6 +54,7 @@ This will:
 
 - Pull the `gvenzl/oracle-xe:21-slim` image (first run only)
 - Initialize the Oracle XE database and execute `db_oracle/schema-oracle.sql` to create all tables
+- Populate all 14 tables with sample data via `db_oracle/seed-data.sql` (2 rows per table)
 - Build the Go backend with Oracle Instant Client
 - Start the backend on port `8080` once Oracle is healthy
 

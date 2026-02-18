@@ -151,3 +151,64 @@ CREATE TABLE paas_deploy_unit (
         FOREIGN KEY (ap_id) REFERENCES release_unit_info (ap_id)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- PaaS Deploy Status
+-- ============================================================
+
+CREATE TABLE paas_deploy_status (
+    status_id                VARCHAR(64)  NOT NULL,
+    unit_id                  VARCHAR(64)  NOT NULL,
+    deploy_status            VARCHAR(64)  DEFAULT NULL,
+    deploy_message           VARCHAR(1024) DEFAULT NULL,
+    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (status_id),
+    CONSTRAINT fk_deploy_status_deploy_unit
+        FOREIGN KEY (unit_id) REFERENCES paas_deploy_unit (unit_id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- PaaS Release Info
+-- ============================================================
+
+CREATE TABLE paas_rlse_info (
+    rlse_id                  VARCHAR(64)  NOT NULL,
+    ap_id                    VARCHAR(64)  NOT NULL,
+    rlse_name                VARCHAR(255) DEFAULT NULL,
+    rlse_description         VARCHAR(1024) DEFAULT NULL,
+    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (rlse_id),
+    CONSTRAINT fk_paas_rlse_release_unit
+        FOREIGN KEY (ap_id) REFERENCES release_unit_info (ap_id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- Release Packages & RU Mapping
+-- ============================================================
+
+CREATE TABLE release_packages (
+    package_id               VARCHAR(64)  NOT NULL,
+    package_name             VARCHAR(255) NOT NULL,
+    package_description      VARCHAR(1024) DEFAULT NULL,
+    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (package_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE rp_ru_mapping (
+    package_id               VARCHAR(64)  NOT NULL,
+    ap_id                    VARCHAR(64)  NOT NULL,
+    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (package_id, ap_id),
+    CONSTRAINT fk_rp_ru_mapping_package
+        FOREIGN KEY (package_id) REFERENCES release_packages (package_id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_rp_ru_mapping_release_unit
+        FOREIGN KEY (ap_id) REFERENCES release_unit_info (ap_id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

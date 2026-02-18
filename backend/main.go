@@ -7,7 +7,7 @@ import (
 	"github.com/terence/dbmigration-backend/internal/config"
 	"github.com/terence/dbmigration-backend/internal/handler"
 	"github.com/terence/dbmigration-backend/internal/repository"
-	"github.com/terence/dbmigration-backend/internal/router"
+	"github.com/terence/dbmigration-backend/internal/server"
 	"github.com/terence/dbmigration-backend/internal/service"
 )
 
@@ -24,7 +24,7 @@ func main() {
 	svc := service.NewProductSuiteService(repo)
 	hdl := handler.NewProductSuiteHandler(svc)
 
-	r := router.Setup(hdl, db)
+	r := server.Setup(hdl, db)
 
 	port := os.Getenv("APP_PORT")
 	if port == "" {

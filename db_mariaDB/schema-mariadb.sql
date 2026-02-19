@@ -1,33 +1,31 @@
--- MariaDB Schema for Product / Release Unit / Deployment hierarchy
+-- ============================================================
+-- Optimized MariaDB Schema
+-- Product / Release Unit / Deployment hierarchy
 -- Requires MariaDB 10.2+ with InnoDB engine
--- Tables are created in dependency order (parents before children)
+--
+-- Changes from original:
+--   1. Eliminated 3 EAV config tables → JSON columns on parent tables
+--   2. Merged release_product_info + release_packages into release_group
+--   3. Merged rp_map + rp_ru_mapping into release_group_ru_map
+--   4. Merged paas_deploy_status into paas_deploy_unit
+--   5. Added indexes on role_map for common query patterns
+--   6. Result: 14 tables → 8 tables
+-- ============================================================
 
 -- ============================================================
 -- Product Suite
 -- ============================================================
 
 CREATE TABLE product_suites_info (
-    prod_suite_id            VARCHAR(64)  NOT NULL,
-    prod_suite_name          VARCHAR(255) NOT NULL,
-    prod_suite_owner_nt_acct VARCHAR(128) DEFAULT NULL,
-    prod_suite_site_owner_acct VARCHAR(128) DEFAULT NULL,
-    division                 VARCHAR(128) DEFAULT NULL,
-    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    prod_suite_id              VARCHAR(64)   NOT NULL,
+    prod_suite_name            VARCHAR(255)  NOT NULL,
+    prod_suite_owner_nt_acct   VARCHAR(128)  DEFAULT NULL,
+    prod_suite_site_owner_acct VARCHAR(128)  DEFAULT NULL,
+    division                   VARCHAR(128)  DEFAULT NULL,
+    config                     JSON          DEFAULT '{}' COMMENT 'Key-value config params (replaces product_suite_config table)',
+    created_at                 DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at                 DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (prod_suite_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE product_suite_config (
-    prod_suite_config_id     VARCHAR(64)  NOT NULL,
-    prod_suite_id            VARCHAR(64)  NOT NULL,
-    prod_suite_config_param  VARCHAR(255) NOT NULL,
-    prod_suite_config_val    VARCHAR(1024) DEFAULT NULL,
-    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (prod_suite_config_id),
-    CONSTRAINT fk_suite_config_suite
-        FOREIGN KEY (prod_suite_id) REFERENCES product_suites_info (prod_suite_id)
-        ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -35,46 +33,42 @@ CREATE TABLE product_suite_config (
 -- ============================================================
 
 CREATE TABLE product_info (
-    prod_id                  VARCHAR(64)  NOT NULL,
-    prod_name                VARCHAR(255) NOT NULL,
-    prod_short_name          VARCHAR(64)  DEFAULT NULL,
-    mgr_nt_acct              VARCHAR(128) DEFAULT NULL,
-    prod_owner_nt_acct       VARCHAR(128) DEFAULT NULL,
-    prod_plat_name           VARCHAR(255) DEFAULT NULL,
-    prod_name_alias          VARCHAR(255) DEFAULT NULL,
-    prod_suite_id            VARCHAR(64)  NOT NULL,
-    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    prod_id            VARCHAR(64)   NOT NULL,
+    prod_name          VARCHAR(255)  NOT NULL,
+    prod_short_name    VARCHAR(64)   DEFAULT NULL,
+    mgr_nt_acct        VARCHAR(128)  DEFAULT NULL,
+    prod_owner_nt_acct VARCHAR(128)  DEFAULT NULL,
+    prod_plat_name     VARCHAR(255)  DEFAULT NULL,
+    prod_name_alias    VARCHAR(255)  DEFAULT NULL,
+    prod_suite_id      VARCHAR(64)   NOT NULL,
+    config             JSON          DEFAULT '{}' COMMENT 'Key-value config params (replaces product_config table)',
+    created_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (prod_id),
+    INDEX idx_product_suite (prod_suite_id),
     CONSTRAINT fk_product_suite
         FOREIGN KEY (prod_suite_id) REFERENCES product_suites_info (prod_suite_id)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE product_config (
-    config_id                VARCHAR(64)  NOT NULL,
-    prod_id                  VARCHAR(64)  NOT NULL,
-    prod_config_param        VARCHAR(255) NOT NULL,
-    prod_config_val          VARCHAR(1024) DEFAULT NULL,
-    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (config_id),
-    CONSTRAINT fk_prod_config_product
-        FOREIGN KEY (prod_id) REFERENCES product_info (prod_id)
-        ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- ============================================================
+-- Role Map
+-- ============================================================
 
 CREATE TABLE role_map (
-    id                       VARCHAR(64)  NOT NULL,
-    prod_id                  VARCHAR(64)  NOT NULL,
-    site                     VARCHAR(128) DEFAULT NULL,
-    acct                     VARCHAR(128) DEFAULT NULL,
-    type                     VARCHAR(64)  DEFAULT NULL,
-    org_code                 VARCHAR(64)  DEFAULT NULL,
-    role_name                VARCHAR(128) DEFAULT NULL,
-    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    id        VARCHAR(64)  NOT NULL,
+    prod_id   VARCHAR(64)  NOT NULL,
+    site      VARCHAR(128) DEFAULT NULL,
+    acct      VARCHAR(128) DEFAULT NULL,
+    type      VARCHAR(64)  DEFAULT NULL,
+    org_code  VARCHAR(64)  DEFAULT NULL,
+    role_name VARCHAR(128) DEFAULT NULL,
+    created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    INDEX idx_role_map_prod_id (prod_id),
+    INDEX idx_role_map_acct (acct),
+    INDEX idx_role_map_prod_role (prod_id, role_name),
     CONSTRAINT fk_role_map_product
         FOREIGN KEY (prod_id) REFERENCES product_info (prod_id)
         ON DELETE CASCADE ON UPDATE CASCADE
@@ -85,87 +79,71 @@ CREATE TABLE role_map (
 -- ============================================================
 
 CREATE TABLE release_unit_info (
-    ap_id                    VARCHAR(64)  NOT NULL,
-    prod_id                  VARCHAR(64)  NOT NULL,
-    ap_name                  VARCHAR(255) NOT NULL,
-    dev_nt_acct              VARCHAR(128) DEFAULT NULL,
-    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    ap_id       VARCHAR(64)  NOT NULL,
+    prod_id     VARCHAR(64)  NOT NULL,
+    ap_name     VARCHAR(255) NOT NULL,
+    dev_nt_acct VARCHAR(128) DEFAULT NULL,
+    config      JSON         DEFAULT '{}' COMMENT 'Key-value config params (replaces release_unit_config table)',
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (ap_id),
+    INDEX idx_release_unit_prod (prod_id),
     CONSTRAINT fk_release_unit_product
         FOREIGN KEY (prod_id) REFERENCES product_info (prod_id)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE release_unit_config (
-    ap_config_id             VARCHAR(64)  NOT NULL,
-    ap_id                    VARCHAR(64)  NOT NULL,
-    ap_config_param          VARCHAR(255) NOT NULL,
-    ap_config_val            VARCHAR(1024) DEFAULT NULL,
-    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (ap_config_id),
-    CONSTRAINT fk_ru_config_release_unit
+-- ============================================================
+-- Release Group  (merged: release_product_info + release_packages)
+-- ============================================================
+
+CREATE TABLE release_group (
+    group_id          VARCHAR(64)              NOT NULL,
+    group_type        ENUM('product','package') NOT NULL,
+    group_name        VARCHAR(255)             NOT NULL,
+    group_description VARCHAR(1024)            DEFAULT NULL,
+    created_at        DATETIME                 NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME                 NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (group_id),
+    INDEX idx_release_group_type (group_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- Release Group ↔ Release Unit Mapping  (merged: rp_map + rp_ru_mapping)
+-- ============================================================
+
+CREATE TABLE release_group_ru_map (
+    group_id   VARCHAR(64) NOT NULL,
+    ap_id      VARCHAR(64) NOT NULL,
+    created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (group_id, ap_id),
+    INDEX idx_rg_ru_map_ap (ap_id),
+    CONSTRAINT fk_rg_ru_map_group
+        FOREIGN KEY (group_id) REFERENCES release_group (group_id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_rg_ru_map_release_unit
         FOREIGN KEY (ap_id) REFERENCES release_unit_info (ap_id)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- Release Product
+-- PaaS Deploy Unit  (merged: paas_deploy_unit + paas_deploy_status)
 -- ============================================================
-
-CREATE TABLE release_product_info (
-    rp_id                    VARCHAR(64)  NOT NULL,
-    rp_name                  VARCHAR(255) NOT NULL,
-    rp_description           VARCHAR(1024) DEFAULT NULL,
-    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (rp_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- Deployment & Mapping
--- ============================================================
-
-CREATE TABLE rp_map (
-    ru_id                    VARCHAR(64)  NOT NULL,
-    rp_id                    VARCHAR(64)  NOT NULL,
-    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (ru_id, rp_id),
-    CONSTRAINT fk_rp_map_release_unit
-        FOREIGN KEY (ru_id) REFERENCES release_unit_info (ap_id)
-        ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT fk_rp_map_release_product
-        FOREIGN KEY (rp_id) REFERENCES release_product_info (rp_id)
-        ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE paas_deploy_unit (
-    unit_id                  VARCHAR(64)  NOT NULL,
-    ap_id                    VARCHAR(64)  NOT NULL,
-    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    unit_id        VARCHAR(64)   NOT NULL,
+    ap_id          VARCHAR(64)   NOT NULL,
+    deploy_status  VARCHAR(64)   DEFAULT NULL  COMMENT 'Current deployment status',
+    deploy_message VARCHAR(1024) DEFAULT NULL  COMMENT 'Current status message',
+    status_history JSON          DEFAULT '[]'  COMMENT 'Array of {status, message, at} for audit trail',
+    created_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (unit_id),
+    INDEX idx_deploy_unit_ap (ap_id),
+    INDEX idx_deploy_unit_status (deploy_status),
     CONSTRAINT fk_paas_deploy_release_unit
         FOREIGN KEY (ap_id) REFERENCES release_unit_info (ap_id)
-        ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- PaaS Deploy Status
--- ============================================================
-
-CREATE TABLE paas_deploy_status (
-    status_id                VARCHAR(64)  NOT NULL,
-    unit_id                  VARCHAR(64)  NOT NULL,
-    deploy_status            VARCHAR(64)  DEFAULT NULL,
-    deploy_message           VARCHAR(1024) DEFAULT NULL,
-    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (status_id),
-    CONSTRAINT fk_deploy_status_deploy_unit
-        FOREIGN KEY (unit_id) REFERENCES paas_deploy_unit (unit_id)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -174,41 +152,48 @@ CREATE TABLE paas_deploy_status (
 -- ============================================================
 
 CREATE TABLE paas_rlse_info (
-    rlse_id                  VARCHAR(64)  NOT NULL,
-    ap_id                    VARCHAR(64)  NOT NULL,
-    rlse_name                VARCHAR(255) DEFAULT NULL,
-    rlse_description         VARCHAR(1024) DEFAULT NULL,
-    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    rlse_id          VARCHAR(64)   NOT NULL,
+    ap_id            VARCHAR(64)   NOT NULL,
+    rlse_name        VARCHAR(255)  DEFAULT NULL,
+    rlse_description VARCHAR(1024) DEFAULT NULL,
+    created_at       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (rlse_id),
+    INDEX idx_paas_rlse_ap (ap_id),
     CONSTRAINT fk_paas_rlse_release_unit
         FOREIGN KEY (ap_id) REFERENCES release_unit_info (ap_id)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 -- ============================================================
--- Release Packages & RU Mapping
+-- Example: JSON config usage
 -- ============================================================
 
-CREATE TABLE release_packages (
-    package_id               VARCHAR(64)  NOT NULL,
-    package_name             VARCHAR(255) NOT NULL,
-    package_description      VARCHAR(1024) DEFAULT NULL,
-    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (package_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Insert with config
+-- INSERT INTO product_info (prod_id, prod_name, prod_suite_id, config)
+-- VALUES ('P001', 'MyProduct', 'S001', '{"timeout": "30", "retry_count": "3", "feature_flag_x": "true"}');
 
-CREATE TABLE rp_ru_mapping (
-    package_id               VARCHAR(64)  NOT NULL,
-    ap_id                    VARCHAR(64)  NOT NULL,
-    created_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (package_id, ap_id),
-    CONSTRAINT fk_rp_ru_mapping_package
-        FOREIGN KEY (package_id) REFERENCES release_packages (package_id)
-        ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT fk_rp_ru_mapping_release_unit
-        FOREIGN KEY (ap_id) REFERENCES release_unit_info (ap_id)
-        ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Read a single config param
+-- SELECT JSON_VALUE(config, '$.timeout') AS timeout
+-- FROM product_info WHERE prod_id = 'P001';
+
+-- Update a single config param (without touching others)
+-- UPDATE product_info
+-- SET config = JSON_SET(config, '$.timeout', '60')
+-- WHERE prod_id = 'P001';
+
+-- Remove a config param
+-- UPDATE product_info
+-- SET config = JSON_REMOVE(config, '$.feature_flag_x')
+-- WHERE prod_id = 'P001';
+
+-- Append to deploy status history
+-- UPDATE paas_deploy_unit
+-- SET deploy_status  = 'DEPLOYED',
+--     deploy_message = 'Rollout complete',
+--     status_history = JSON_ARRAY_APPEND(
+--         status_history, '$',
+--         JSON_OBJECT('status', 'DEPLOYED', 'message', 'Rollout complete', 'at', NOW())
+--     )
+-- WHERE unit_id = 'U001';

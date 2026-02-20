@@ -471,7 +471,7 @@ All rows should show `status = completed`.
 
 ```bash
 # Oracle counts
-docker exec oracle-xe sqlplus -s system/oracle@XEPDB1 <<'SQL'
+docker exec -i oracle-xe sqlplus -s system/oracle@XEPDB1 <<'SQL'
 SELECT 'product_suites_info', COUNT(*) FROM product_suites_info
 UNION ALL SELECT 'product_info', COUNT(*) FROM product_info
 UNION ALL SELECT 'role_map', COUNT(*) FROM role_map
@@ -519,8 +519,8 @@ Cross-check a specific row:
 
 ```bash
 # Oracle: count config params for a known suite
-docker exec oracle-xe sqlplus -s system/oracle@XEPDB1 \
-  -e "SELECT COUNT(*) FROM product_suite_config WHERE prod_suite_id = 'YOUR-ID';"
+docker exec -i oracle-xe sqlplus -s system/oracle@XEPDB1 \
+  <<< "SELECT COUNT(*) FROM product_suite_config WHERE prod_suite_id = 'YOUR-ID';"
 
 # MariaDB: count keys in the JSON config for the same suite
 docker exec mariadb mariadb -u mariadb -pmariadb migration_db \
@@ -545,8 +545,8 @@ Cross-check:
 
 ```bash
 # Oracle: how many status events does a unit have?
-docker exec oracle-xe sqlplus -s system/oracle@XEPDB1 \
-  -e "SELECT COUNT(*) FROM paas_deploy_status WHERE unit_id = 'YOUR-UNIT-ID';"
+docker exec -i oracle-xe sqlplus -s system/oracle@XEPDB1 \
+  <<< "SELECT COUNT(*) FROM paas_deploy_status WHERE unit_id = 'YOUR-UNIT-ID';"
 
 # MariaDB: how many entries are in the history array?
 docker exec mariadb mariadb -u mariadb -pmariadb migration_db \
@@ -609,7 +609,7 @@ MariaDB connection failed: ping mariadb: ...
   docker exec mariadb mariadb -u mariadb -pmariadb migration_db -e "SELECT 1;"
 
   # Oracle
-  docker exec oracle-xe sqlplus system/oracle@XEPDB1 <<< "SELECT 1 FROM dual;"
+  docker exec -i oracle-xe sqlplus system/oracle@XEPDB1 <<< "SELECT 1 FROM dual;"
   ```
 - Check that `ORACLE_HOST` and `MARIADB_HOST` match the container names or exposed addresses.
   When running the script via `docker-compose run migrate`, both default to the service names
@@ -631,7 +631,7 @@ schema/service.
 **Checks:**
 - Verify that `db_oracle/schema-oracle.sql` was loaded:
   ```bash
-  docker exec oracle-xe sqlplus system/oracle@XEPDB1 \
+  docker exec -i oracle-xe sqlplus system/oracle@XEPDB1 \
     <<< "SELECT table_name FROM user_tables ORDER BY table_name;"
   ```
   All 14 tables should appear.

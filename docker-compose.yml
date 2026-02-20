@@ -33,7 +33,7 @@ services:
       - mariadb-data:/var/lib/mysql
       - ./db_mariaDB/schema-mariadb.sql:/docker-entrypoint-initdb.d/01-schema.sql
     healthcheck:
-      test: ["CMD", "healthcheck.sh"]
+      test: ["CMD", "mariadb", "-uroot", "-pmariadb", "-e", "SELECT 1"]
       interval: 10s
       timeout: 5s
       retries: 10

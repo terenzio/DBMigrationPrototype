@@ -74,26 +74,28 @@ values.
 
 ## Prerequisites
 
-1. **Both containers must be running** and healthy before the script is executed:
+1. **Build and start all services** so that oracle-xe and mariadb are healthy before the migration
+   runs. Use `--build` to ensure the Docker image includes the latest `migrate` binary:
 
    ```bash
-   docker-compose up -d
-   docker-compose ps   # oracle-xe and mariadb should show "healthy"
+   docker-compose up --build -d
+   docker-compose ps   # oracle-xe and mariadb must show "healthy"
    ```
 
    Oracle XE can take 2–3 minutes to fully initialise on first boot. The `healthcheck.sh` probe
    inside the container confirms the database is accepting connections before the status changes.
+   The `migrate` service's `depends_on` block enforces this automatically when you run it.
 
 2. **The MariaDB schema must already exist.** The `docker-compose.yml` mounts
    `db_mariaDB/schema-mariadb.sql` as an init script, so the 8 target tables are created
    automatically when the MariaDB container first starts.
 
-3. **Oracle Instant Client libraries** must be available on the machine running the script (they
-   are already installed inside the `backend` Docker image, but are also required when running the
-   script locally via `go run`). See the `backend/Dockerfile` for the exact package names.
-
-4. **Go 1.22+** must be installed locally if running with `go run`. The binary can alternatively
-   be built once and copied into the running container.
+3. **Oracle Instant Client is required by the godror driver** at runtime. It is already installed
+   inside the Docker image (see `backend/Dockerfile`), which is why running via Docker Compose is
+   the recommended approach. Running the script directly on macOS or Linux without the client
+   libraries installed will fail — see
+   [Oracle Instant Client not found](#oracle-instant-client-not-found-macos--linux) in the
+   debugging section.
 
 ---
 
@@ -118,7 +120,7 @@ All variables have defaults that match the `docker-compose.yml` service configur
 Override any variable by setting it in the shell before running the script:
 
 ```bash
-ORACLE_HOST=oracle-xe BATCH_SIZE=500 go run ./cmd/migrate/main.go
+BATCH_SIZE=500 docker-compose --profile migrate run --rm migrate
 ```
 
 ---

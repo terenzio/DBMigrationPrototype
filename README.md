@@ -1103,9 +1103,7 @@ curl http://localhost:8080/health
 
 ## 13. Additional Documentation
 
-- [MariaDB vs Oracle Schema Differences](docs/mariadb-vs-oracle.md) — detailed comparison of both schemas and Go repository layer examples
+- [MariaDB vs Oracle Schema Differences](README_DB_COMPARISON.md) — detailed schema comparison and Go repository layer examples
 - [ER Diagram](docs/erDiagram.md) — entity-relationship diagram for the full schema
-- [Schema Improvements](docs/Improvements.md) — schema improvements made during migration
-- [Schema Optimization](docs/OptimizedDatabase.md) — detailed rationale for 14→8 table optimization
 - [Product Release Mapping](docs/product_release_mapping.png) — visual diagram
 - [Product Release Mapping (Full)](docs/product_release_mapping_full.png) — expanded visual diagram

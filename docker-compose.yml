@@ -58,6 +58,31 @@ services:
         condition: service_healthy
     restart: on-failure
 
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ./migrate
+    profiles: ["migrate"]
+    environment:
+      ORACLE_HOST: oracle-xe
+      ORACLE_PORT: "1521"
+      ORACLE_SERVICE: XEPDB1
+      ORACLE_USER: system
+      ORACLE_PASSWORD: oracle
+      MARIADB_HOST: mariadb
+      MARIADB_PORT: "3306"
+      MARIADB_DATABASE: migration_db
+      MARIADB_USER: mariadb
+      MARIADB_PASSWORD: mariadb
+      BATCH_SIZE: "1000"
+    depends_on:
+      oracle-xe:
+        condition: service_healthy
+      mariadb:
+        condition: service_healthy
+    restart: "no"
+
 volumes:
   oracle-data:
   mariadb-data:

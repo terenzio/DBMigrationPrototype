@@ -13,7 +13,8 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o /app/server main.go
+RUN go build -o /app/server main.go && \
+    go build -o /app/migrate ./cmd/migrate/main.go
 
 # ---- Runtime stage ----
 FROM oraclelinux:8-slim
@@ -26,6 +27,7 @@ ENV LD_LIBRARY_PATH=/usr/lib/oracle/23.7/client64/lib
 
 WORKDIR /app
 COPY --from=builder /app/server .
+COPY --from=builder /app/migrate .
 
 EXPOSE 8080
 CMD ["./server"]

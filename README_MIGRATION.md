@@ -125,37 +125,57 @@ ORACLE_HOST=oracle-xe BATCH_SIZE=500 go run ./cmd/migrate/main.go
 
 ## How to run
 
-### Standard run (from host with containers exposed on localhost)
+### Via Docker Compose (recommended)
+
+The migration binary is built into the same Docker image as the backend, which already contains
+the Oracle Instant Client libraries. The `migrate` service is declared with a
+[Compose profile](https://docs.docker.com/compose/profiles/) so it does not start automatically
+with `docker-compose up`.
+
+**First, ensure the other services are running and healthy:**
 
 ```bash
-cd backend
-go run ./cmd/migrate/main.go
+docker-compose up -d
+docker-compose ps   # oracle-xe and mariadb must show "healthy" before proceeding
 ```
 
-### Build once, run repeatedly
+**Then run the migration:**
 
 ```bash
-cd backend
-go build -o migrate ./cmd/migrate/main.go
-./migrate
+docker-compose --profile migrate run --rm migrate
 ```
 
-### Run inside the backend container
+`--rm` removes the stopped container afterwards. The service connects to `oracle-xe` and `mariadb`
+by their Docker Compose service names, which resolve automatically inside the Docker network.
 
-If Oracle Instant Client is not installed locally, the script can be executed inside the running
-backend container where the libraries are already present:
+To override `BATCH_SIZE` or any other variable for this run:
 
 ```bash
-# Copy the source into the running container and build there
-docker exec go-backend sh -c "cd /app && go build -o /tmp/migrate ./cmd/migrate/main.go && /tmp/migrate"
+BATCH_SIZE=500 docker-compose --profile migrate run --rm migrate
 ```
 
-Or, if targeting containers from outside (Oracle and MariaDB ports are exposed):
+### Locally (requires Oracle Instant Client on macOS/Linux)
+
+The godror driver links against `libclntsh.dylib` (macOS) or `libclntsh.so` (Linux) at runtime.
+Running `go run` locally without those libraries installed produces:
+
+```
+ORA-00000: DPI-1047: Cannot locate a 64-bit Oracle Client library
+```
+
+If you do have Oracle Instant Client installed locally, set the library path and point the script
+at the exposed container ports:
 
 ```bash
+# macOS — adjust the version path to match your Instant Client installation
+export DYLD_LIBRARY_PATH=/usr/local/lib/oracle/23/client64/lib
+
 cd backend
 ORACLE_HOST=localhost MARIADB_HOST=localhost go run ./cmd/migrate/main.go
 ```
+
+For installation instructions see:
+https://oracle.github.io/odpi/doc/installation.html#macos
 
 ### Expected output
 
@@ -545,6 +565,27 @@ The `product` count must equal Oracle's `SELECT COUNT(*) FROM release_product_in
 
 ## Debugging errors
 
+### Oracle Instant Client not found (macOS / Linux)
+
+**Symptom:**
+```
+Oracle connection failed: ping oracle: ORA-00000: DPI-1047: Cannot locate a 64-bit Oracle Client library:
+"dlopen(libclntsh.dylib, 0x0001): tried: 'libclntsh.dylib' (no such file) ..."
+```
+
+**Cause:** The godror driver requires Oracle Instant Client libraries to be present on the machine
+running the binary. They are included in the Docker image but are not installed on your Mac by default.
+
+**Fix:** Use the Docker Compose approach instead of running `go run` locally:
+
+```bash
+docker-compose --profile migrate run --rm migrate
+```
+
+This runs the binary inside the container where the libraries are already installed.
+
+---
+
 ### Connection failures at startup
 
 **Symptom:**
@@ -569,8 +610,9 @@ MariaDB connection failed: ping mariadb: ...
   docker exec oracle-xe sqlplus system/oracle@XEPDB1 <<< "SELECT 1 FROM dual;"
   ```
 - Check that `ORACLE_HOST` and `MARIADB_HOST` match the container names or exposed addresses.
-  When running the script outside Docker against containers, both should be `localhost`.
-  When running the script inside a Docker network, use the service names (`oracle-xe`, `mariadb`).
+  When running the script via `docker-compose run migrate`, both default to the service names
+  (`oracle-xe`, `mariadb`) which resolve inside the Docker network.
+  When running the script locally against exposed ports, override both to `localhost`.
 
 ---
 

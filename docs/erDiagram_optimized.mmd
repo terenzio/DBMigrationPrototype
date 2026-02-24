@@ -1,0 +1,124 @@
+erDiagram
+
+    %% =============================================
+    %% Relationships  (8-table optimized schema)
+    %% EAV config tables eliminated → JSON columns on parent tables
+    %% release_product_info + release_packages → release_group
+    %% rp_map + rp_ru_mapping → release_group_ru_map
+    %% paas_deploy_status folded → paas_deploy_unit
+    %% =============================================
+
+    %% Product Suite relationships
+    PRODUCT_SUITES_INFO ||--o{ PRODUCT_INFO : "has"
+
+    %% Product relationships
+    PRODUCT_INFO ||--o{ ROLE_MAP : "has_roles"
+    PRODUCT_INFO ||--o{ RELEASE_UNIT_INFO : "contains"
+
+    %% Release Unit relationships
+    RELEASE_UNIT_INFO ||--o{ RELEASE_GROUP_RU_MAP : "mapped in"
+    RELEASE_UNIT_INFO ||--o{ PAAS_DEPLOY_UNIT : "deployed"
+    RELEASE_UNIT_INFO ||--o{ PAAS_RLSE_INFO : "has release info"
+
+    %% Release Group relationships
+    RELEASE_GROUP ||--o{ RELEASE_GROUP_RU_MAP : "groups"
+
+    %% =============================================
+    %% Entity Definitions
+    %% =============================================
+
+    %% ----- Product Suite -----
+
+    PRODUCT_SUITES_INFO {
+        VARCHAR PROD_SUITE_ID PK "Primary Key"
+        VARCHAR PROD_SUITE_NAME ""
+        VARCHAR PROD_SUITE_OWNER_NT_ACCT ""
+        VARCHAR PROD_SUITE_SITE_OWNER_ACCT ""
+        VARCHAR DIVISION ""
+        JSON CONFIG "Replaces product_suite_config (EAV)"
+        DATETIME CREATED_AT ""
+        DATETIME UPDATED_AT ""
+    }
+
+    %% ----- Product -----
+
+    PRODUCT_INFO {
+        VARCHAR PROD_ID PK "Primary Key"
+        VARCHAR PROD_NAME ""
+        VARCHAR PROD_SHORT_NAME ""
+        VARCHAR MGR_NT_ACCT ""
+        VARCHAR PROD_OWNER_NT_ACCT ""
+        VARCHAR PROD_PLAT_NAME ""
+        VARCHAR PROD_NAME_ALIAS ""
+        VARCHAR PROD_SUITE_ID FK "References PRODUCT_SUITES_INFO"
+        JSON CONFIG "Replaces product_config (EAV)"
+        DATETIME CREATED_AT ""
+        DATETIME UPDATED_AT ""
+    }
+
+    ROLE_MAP {
+        VARCHAR ID PK "Primary Key"
+        VARCHAR PROD_ID FK "References PRODUCT_INFO"
+        VARCHAR SITE ""
+        VARCHAR ACCT ""
+        VARCHAR TYPE ""
+        VARCHAR ORG_CODE ""
+        VARCHAR ROLE_NAME ""
+        DATETIME CREATED_AT ""
+        DATETIME UPDATED_AT ""
+    }
+
+    %% ----- Release Unit -----
+
+    RELEASE_UNIT_INFO {
+        VARCHAR AP_ID PK "Primary Key"
+        VARCHAR PROD_ID FK "References PRODUCT_INFO"
+        VARCHAR AP_NAME ""
+        VARCHAR DEV_NT_ACCT ""
+        JSON CONFIG "Replaces release_unit_config (EAV)"
+        DATETIME CREATED_AT ""
+        DATETIME UPDATED_AT ""
+    }
+
+    %% ----- Release Group (merged: release_product_info + release_packages) -----
+
+    RELEASE_GROUP {
+        VARCHAR GROUP_ID PK "Primary Key"
+        ENUM GROUP_TYPE "product | package"
+        VARCHAR GROUP_NAME ""
+        VARCHAR GROUP_DESCRIPTION ""
+        DATETIME CREATED_AT ""
+        DATETIME UPDATED_AT ""
+    }
+
+    %% ----- Release Group ↔ Release Unit Map (merged: rp_map + rp_ru_mapping) -----
+
+    RELEASE_GROUP_RU_MAP {
+        VARCHAR GROUP_ID PK,FK "References RELEASE_GROUP"
+        VARCHAR AP_ID PK,FK "References RELEASE_UNIT_INFO"
+        DATETIME CREATED_AT ""
+        DATETIME UPDATED_AT ""
+    }
+
+    %% ----- PaaS Deploy Unit (merged: paas_deploy_unit + paas_deploy_status) -----
+
+    PAAS_DEPLOY_UNIT {
+        VARCHAR UNIT_ID PK "Primary Key"
+        VARCHAR AP_ID FK "References RELEASE_UNIT_INFO"
+        VARCHAR DEPLOY_STATUS "Current status"
+        VARCHAR DEPLOY_MESSAGE "Current status message"
+        JSON STATUS_HISTORY "Ordered audit trail [{status, message, at}]"
+        DATETIME CREATED_AT ""
+        DATETIME UPDATED_AT ""
+    }
+
+    %% ----- PaaS Release Info -----
+
+    PAAS_RLSE_INFO {
+        VARCHAR RLSE_ID PK "Primary Key"
+        VARCHAR AP_ID FK "References RELEASE_UNIT_INFO"
+        VARCHAR RLSE_NAME ""
+        VARCHAR RLSE_DESCRIPTION ""
+        DATETIME CREATED_AT ""
+        DATETIME UPDATED_AT ""
+    }

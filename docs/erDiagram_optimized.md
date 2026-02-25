@@ -4,8 +4,8 @@ erDiagram
     %% =============================================
     %% Relationships  (8-table optimized schema)
     %% EAV config tables eliminated → JSON columns on parent tables
-    %% release_product_info + release_packages → release_group
-    %% rp_map + rp_ru_mapping → release_group_ru_map
+    %% release_product_info removed; release_packages enriched → release_group
+    %% rp_map + rp_ru_mapping (both now from release_packages) → release_group_ru_map
     %% paas_deploy_status folded → paas_deploy_unit
     %% =============================================
 
@@ -15,6 +15,7 @@ erDiagram
     %% Product relationships
     PRODUCT_INFO ||--o{ ROLE_MAP : "has_roles"
     PRODUCT_INFO ||--o{ RELEASE_UNIT_INFO : "contains"
+    PRODUCT_INFO ||--o{ RELEASE_GROUP : "has packages"
 
     %% Release Unit relationships
     RELEASE_UNIT_INFO ||--o{ RELEASE_GROUP_RU_MAP : "mapped in"
@@ -81,13 +82,21 @@ erDiagram
         DATETIME UPDATED_AT ""
     }
 
-    %% ----- Release Group (merged: release_product_info + release_packages) -----
+    %% ----- Release Group (sourced from enriched release_packages only) -----
 
     RELEASE_GROUP {
         VARCHAR GROUP_ID PK "Primary Key"
-        ENUM GROUP_TYPE "product | package"
+        VARCHAR PROD_ID FK "References PRODUCT_INFO"
         VARCHAR GROUP_NAME ""
         VARCHAR GROUP_DESCRIPTION ""
+        VARCHAR ACRONYM ""
+        VARCHAR AP_LEVEL ""
+        JSON OWNER ""
+        TEXT CD_DETAILS ""
+        VARCHAR OLD_RP_ID "Legacy release_product_info reference"
+        VARCHAR CHANGE_LEVEL ""
+        INT VERSION ""
+        BOOLEAN IS_DELETED ""
         DATETIME CREATED_AT ""
         DATETIME UPDATED_AT ""
     }

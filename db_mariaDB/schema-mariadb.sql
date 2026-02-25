@@ -5,11 +5,11 @@
 --
 -- Changes from original:
 --   1. Eliminated 3 EAV config tables → JSON columns on parent tables
---   2. Merged release_product_info + release_packages into release_group
---   3. Merged rp_map + rp_ru_mapping into release_group_ru_map
+--   2. release_packages (enriched; release_product_info removed) → release_group
+--   3. Merged rp_map + rp_ru_mapping (both from release_packages) → release_group_ru_map
 --   4. Merged paas_deploy_status into paas_deploy_unit
 --   5. Added indexes on role_map for common query patterns
---   6. Result: 14 tables → 8 tables
+--   6. Result: 13 Oracle tables → 8 MariaDB tables
 -- ============================================================
 
 -- ============================================================
@@ -94,18 +94,30 @@ CREATE TABLE release_unit_info (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- Release Group  (merged: release_product_info + release_packages)
+-- Release Group  (sourced from enriched release_packages only)
 -- ============================================================
 
 CREATE TABLE release_group (
-    group_id          VARCHAR(64)              NOT NULL,
-    group_type        ENUM('product','package') NOT NULL,
-    group_name        VARCHAR(255)             NOT NULL,
-    group_description VARCHAR(1024)            DEFAULT NULL,
-    created_at        DATETIME                 NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at        DATETIME                 NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    group_id          VARCHAR(64)   NOT NULL,
+    prod_id           VARCHAR(64)   DEFAULT NULL COMMENT 'References product_info',
+    group_name        VARCHAR(255)  NOT NULL,
+    group_description VARCHAR(1024) DEFAULT NULL,
+    acronym           VARCHAR(128)  DEFAULT NULL,
+    ap_level          VARCHAR(128)  DEFAULT NULL,
+    owner             JSON          DEFAULT NULL COMMENT 'Owner metadata from release_packages',
+    cd_details        TEXT          DEFAULT NULL,
+    old_rp_id         VARCHAR(64)   DEFAULT NULL COMMENT 'Legacy release_product_info.rp_id reference',
+    change_level      VARCHAR(128)  DEFAULT NULL,
+    version           INT           DEFAULT NULL,
+    is_deleted        TINYINT(1)    NOT NULL DEFAULT 0,
+    created_at        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (group_id),
-    INDEX idx_release_group_type (group_type)
+    INDEX idx_release_group_prod (prod_id),
+    INDEX idx_release_group_deleted (is_deleted),
+    CONSTRAINT fk_release_group_product
+        FOREIGN KEY (prod_id) REFERENCES product_info (prod_id)
+        ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

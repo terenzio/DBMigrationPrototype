@@ -1,6 +1,6 @@
 # DBMigrationPrototype
 
-A prototype project demonstrating an Oracle-to-MariaDB database migration strategy with a Go backend service using the GIN framework. The Oracle source database has **14 tables**; the MariaDB target has been optimized down to **8 tables** by collapsing EAV config tables into JSON columns, merging structurally similar release-grouping entities, and folding deploy-status history into its parent table.
+A prototype project demonstrating an Oracle-to-MariaDB database migration strategy with a Go backend service using the GIN framework. The Oracle source database has **13 tables**; the MariaDB target has been optimized down to **8 tables** by collapsing EAV config tables into JSON columns, consolidating release-grouping entities, and folding deploy-status history into its parent table.
 
 ---
 
@@ -14,7 +14,7 @@ A prototype project demonstrating an Oracle-to-MariaDB database migration strate
 6. [Running the Migration](#6-running-the-migration)
 7. [How the Migration Works](#7-how-the-migration-works)
 8. [Schema Improvements](#8-schema-improvements)
-9. [Schema Optimization: 14 → 8 Tables](#9-schema-optimization-14--8-tables)
+9. [Schema Optimization: 13 → 8 Tables](#9-schema-optimization-13--8-tables)
 10. [Verifying Migration Results](#10-verifying-migration-results)
 11. [Debugging Migration Errors](#11-debugging-migration-errors)
 12. [Common Operations](#12-common-operations)
@@ -24,7 +24,7 @@ A prototype project demonstrating an Oracle-to-MariaDB database migration strate
 
 ## 1. Project Overview
 
-The project consists of an Oracle-backed Go API (proof-of-concept) and a standalone ETL binary that migrates all data from Oracle XE into an optimized MariaDB schema. The migration is implemented as a one-time batch process that reads from Oracle, transforms in Go, and writes to MariaDB.
+The project consists of an Oracle-backed Go API (proof-of-concept) and a standalone ETL binary that migrates all data from Oracle XE into an optimized MariaDB schema. The migration is implemented as a one-time batch process that reads from Oracle, transforms in Go, and writes to MariaDB. The Oracle source database has **13 tables**; the MariaDB target has been optimized down to **8 tables**.
 
 ### Project Structure
 
@@ -89,7 +89,7 @@ This will:
 
 - Pull the `gvenzl/oracle-xe:21-slim` and `mariadb:11` images (first run only)
 - Initialize the Oracle XE database and execute `db_oracle/schema-oracle.sql` to create all tables
-- Populate all 14 Oracle tables with sample data via `db_oracle/seed-data.sql` (2 rows per table)
+- Populate all 13 Oracle tables with sample data via `db_oracle/seed-data.sql` (2 rows per table)
 - Initialize the MariaDB database and execute `db_mariaDB/schema-mariadb.sql` to create all 8 target tables
 - Build the Go backend with Oracle Instant Client
 - Start the backend on port `8080` once Oracle is healthy
@@ -356,10 +356,9 @@ On a re-run after an interrupted migration (e.g. crash at offset 3000):
 | `role_map` | `role_map` | Direct column copy |
 | `release_unit_info` | `release_unit_info` | Direct column copy |
 | `release_unit_config` (EAV) | `release_unit_info.config` | All rows aggregated into a single JSON object keyed by `ap_config_param` |
-| `release_product_info` | `release_group` | `rp_id→group_id`, `rp_name→group_name`, `rp_description→group_description`, `group_type='product'` |
-| `release_packages` | `release_group` | `package_id→group_id`, `package_name→group_name`, `package_description→group_description`, `group_type='package'` |
+| `release_packages` | `release_group` | `package_id→group_id`, `name→group_name`, `description→group_description`; all enriched fields (`prod_id`, `acronym`, `ap_level`, `owner`, `cd_details`, `old_rp_id`, `change_level`, `version`, `is_deleted`) copied directly |
 | `rp_map` | `release_group_ru_map` | `rp_id→group_id`, `ru_id→ap_id` |
-| `rp_ru_mapping` | `release_group_ru_map` | `package_id→group_id`, `ap_id` direct |
+| `rp_ru_mapping` | `release_group_ru_map` | `release_package_id→group_id`, `release_unit_id→ap_id` |
 | `paas_deploy_unit` | `paas_deploy_unit` | `unit_id`, `ap_id` direct copy; latest `paas_deploy_status` row → `deploy_status` / `deploy_message` |
 | `paas_deploy_status` | `paas_deploy_unit.status_history` | All rows ordered by `created_at ASC` → JSON array `[{status, message, at}]` |
 | `paas_rlse_info` | `paas_rlse_info` | Direct column copy |
@@ -520,7 +519,6 @@ Each row tracks one logical source table:
 | `product_info` | Oracle `product_info` |
 | `role_map` | Oracle `role_map` |
 | `release_unit_info` | Oracle `release_unit_info` |
-| `release_product_info` | Oracle `release_product_info` (feeds `release_group`) |
 | `release_packages` | Oracle `release_packages` (feeds `release_group`) |
 | `rp_map` | Oracle `rp_map` (feeds `release_group_ru_map`) |
 | `rp_ru_mapping` | Oracle `rp_ru_mapping` (feeds `release_group_ru_map`) |
@@ -608,9 +606,9 @@ This section summarizes the improvements made to the product/deployment hierarch
 
 ---
 
-## 9. Schema Optimization: 14 → 8 Tables
+## 9. Schema Optimization: 13 → 8 Tables
 
-The original MariaDB schema for the Product / Release Unit / Deployment hierarchy contained 14 tables. Through a series of targeted optimizations — primarily leveraging MariaDB's JSON column support and merging structurally similar entities — the schema was consolidated to 8 tables without losing any functional capability.
+The Oracle schema for the Product / Release Unit / Deployment hierarchy contains 13 tables. Through a series of targeted optimizations — primarily leveraging MariaDB's JSON column support and consolidating release-grouping entities — the schema was reduced to 8 MariaDB tables without losing any functional capability.
 
 ### Optimization 1: Eliminate EAV Config Tables with JSON Columns
 
@@ -634,30 +632,31 @@ These were replaced by a single `config JSON DEFAULT '{}'` column on each parent
 
 If the application frequently needs cross-entity config queries (e.g., "find all products where `feature_flag_x = true`"), a generated virtual column with an index on the specific key is recommended. High write-concurrency on different config keys for the same entity will experience row-level lock contention with the JSON approach, whereas the EAV table allowed independent row locks per key.
 
-### Optimization 2: Merge Release Grouping Tables
+### Optimization 2: Consolidate Release Grouping Tables
 
-**Tables removed:** `release_product_info`, `release_packages`, `rp_map`, `rp_ru_mapping` (−4 tables)
-**Tables added:** `release_group`, `release_group_ru_map` (+2 tables)
+**Tables removed:** `release_product_info` (already eliminated in Oracle), `release_packages`, `rp_map`, `rp_ru_mapping` (−4 Oracle tables)
+**Tables added:** `release_group`, `release_group_ru_map` (+2 MariaDB tables)
 **Net effect:** −2 tables
 
-The original schema had two nearly identical concepts:
+The Oracle schema previously had two separate concepts (`release_product_info` and `release_packages`), each with its own many-to-many mapping to release units. `release_product_info` has since been removed from the Oracle schema and its data folded into the now-enriched `release_packages` table (the `old_rp_id` column preserves traceability to the legacy record). Both mapping tables (`rp_map` and `rp_ru_mapping`) now reference `release_packages` directly.
 
-| Original Table | Purpose |
-|---|---|
-| `release_product_info` (id, name, description) | A named release product grouping |
-| `release_packages` (id, name, description) | A named release package grouping |
+In the optimized MariaDB schema, `release_packages` maps 1:1 to `release_group`, and both Oracle mapping tables are merged into the single `release_group_ru_map` join table.
 
-Each had its own many-to-many mapping table linking it to release units (`rp_map` and `rp_ru_mapping` respectively). Since both entities share the same structure and the same relationship pattern, they were unified into a single `release_group` table with a `group_type ENUM('product', 'package')` discriminator column, and a single `release_group_ru_map` join table.
+| Oracle Table | MariaDB Table | Notes |
+|---|---|---|
+| `release_packages` | `release_group` | All enriched columns preserved |
+| `rp_map` | `release_group_ru_map` | `rp_id→group_id`, `ru_id→ap_id` |
+| `rp_ru_mapping` | `release_group_ru_map` | `release_package_id→group_id`, `release_unit_id→ap_id` |
 
 #### Benefits
 
-- One set of CRUD operations handles both concepts.
+- One set of CRUD operations handles all release grouping.
 - Queries that need "all groups for a release unit" no longer require a UNION across two mapping tables.
-- The `group_type` column is indexed for efficient filtering when only one type is needed.
+- The full `release_packages` payload (owner JSON, cd_details, versioning, etc.) is preserved without lossy projection.
 
 #### When to reconsider
 
-If the two concepts diverge in the future (e.g., packages gain versioning columns that products don't need), splitting them back out is straightforward. The ENUM column can be extended with additional types if new grouping concepts emerge.
+If release groups require new sub-types with divergent schemas (beyond the current flat structure), introducing a discriminator column or separate tables is straightforward. The `old_rp_id` column can be dropped once legacy cross-reference queries are retired.
 
 ### Optimization 3: Merge Deploy Status into Deploy Unit
 
@@ -744,7 +743,6 @@ SELECT 'product_suites_info', COUNT(*) FROM product_suites_info
 UNION ALL SELECT 'product_info', COUNT(*) FROM product_info
 UNION ALL SELECT 'role_map', COUNT(*) FROM role_map
 UNION ALL SELECT 'release_unit_info', COUNT(*) FROM release_unit_info
-UNION ALL SELECT 'release_product_info', COUNT(*) FROM release_product_info
 UNION ALL SELECT 'release_packages', COUNT(*) FROM release_packages
 UNION ALL SELECT 'rp_map', COUNT(*) FROM rp_map
 UNION ALL SELECT 'rp_ru_mapping', COUNT(*) FROM rp_ru_mapping
@@ -764,8 +762,7 @@ UNION ALL SELECT 'paas_deploy_unit',     COUNT(*) FROM paas_deploy_unit
 UNION ALL SELECT 'paas_rlse_info',       COUNT(*) FROM paas_rlse_info;"
 ```
 
-Expected: the `release_group` count equals `release_product_info` count + `release_packages`
-count, and `release_group_ru_map` count equals `rp_map` count + `rp_ru_mapping` count.
+Expected: the `release_group` count equals the Oracle `release_packages` count, and `release_group_ru_map` count equals `rp_map` count + `rp_ru_mapping` count.
 
 ### 3. Spot-check JSON config columns
 
@@ -821,15 +818,14 @@ docker exec mariadb mariadb -u mariadb -pmariadb migration_db \
   -e "SELECT JSON_LENGTH(status_history) FROM paas_deploy_unit WHERE unit_id = 'YOUR-UNIT-ID';"
 ```
 
-### 5. Check release_group type split
+### 5. Check release_group count
 
 ```bash
 docker exec mariadb mariadb -u mariadb -pmariadb migration_db \
-  -e "SELECT group_type, COUNT(*) FROM release_group GROUP BY group_type;"
+  -e "SELECT COUNT(*) FROM release_group;"
 ```
 
-The `product` count must equal Oracle's `SELECT COUNT(*) FROM release_product_info` and the
-`package` count must equal Oracle's `SELECT COUNT(*) FROM release_packages`.
+The count must equal Oracle's `SELECT COUNT(*) FROM release_packages`. `release_product_info` no longer exists in the Oracle schema — its data was folded into `release_packages` (accessible via the `old_rp_id` column).
 
 ---
 
@@ -902,7 +898,7 @@ schema/service.
   docker exec -i oracle-xe sqlplus system/oracle@XEPDB1 \
     <<< "SELECT table_name FROM user_tables ORDER BY table_name;"
   ```
-  All 14 tables should appear.
+  All 13 tables should appear.
 - If the table list is empty, the init script did not run. Destroy and recreate the volume:
   ```bash
   docker-compose down -v

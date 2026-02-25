@@ -20,7 +20,6 @@ erDiagram
     RELEASE_UNIT_INFO ||--o{ PAAS_RLSE_INFO : "has release info"
 
     %% Release Product and Package relationships
-    RELEASE_PRODUCT_INFO ||--o{ RP_MAP : "mapped to"
     release_packages ||--o{ rp_ru_mapping : "contains"
     rp_ru_mapping }o--|| RELEASE_UNIT_INFO : "maps to"
 
@@ -108,19 +107,11 @@ erDiagram
         DATETIME UPDATED_AT ""
     }
 
-    %% ----- Release Product / Package Entities -----
-
-    RELEASE_PRODUCT_INFO {
-        VARCHAR RP_ID PK "Primary Key"
-        VARCHAR RP_NAME ""
-        VARCHAR RP_DESCRIPTION ""
-        DATETIME CREATED_AT ""
-        DATETIME UPDATED_AT ""
-    }
+    %% ----- Release Product / Package Entities -----   
 
     RP_MAP {
         VARCHAR RU_ID PK,FK "References RELEASE_UNIT_INFO"
-        VARCHAR RP_ID PK,FK "References RELEASE_PRODUCT_INFO"
+        VARCHAR RP_ID PK,FK "References release_packages"
         DATETIME CREATED_AT ""
         DATETIME UPDATED_AT ""
     }
@@ -132,4 +123,32 @@ erDiagram
         VARCHAR AP_ID FK "References"
         DATETIME CREATED_AT ""
         DATETIME UPDATED_AT ""
+    }
+
+    PAAS_DEPLOY_STATUS {
+        VARCHAR STATUS_ID PK "Primary Key"
+        VARCHAR UNIT_ID FK "References PAAS_DEPLOY_UNIT"
+        VARCHAR STATUS ""
+    }
+    
+    %% ----- RP_RU1 Entities -----
+
+    rp_ru_mapping {
+        INT release_unit_id PK, FK "References RELEASE_UNIT_INFO"
+        INT release_package_id PK, FK "References release_packages"
+        BOOLEAN is_deleted ""
+    }
+
+    release_packages {
+        INT id PK
+        INT prod_id FK "References PRODUCT_INFO"
+        VARCHAR name ""
+        VARCHAR acronym ""
+        VARCHAR ap_level ""
+        JSON owner ""
+        TEXT cd_details ""
+        INT old_rp_id ""
+        VARCHAR change_level ""
+        INT version ""
+        BOOLEAN is_deleted ""
     }

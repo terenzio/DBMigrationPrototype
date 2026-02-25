@@ -116,21 +116,30 @@ CREATE TABLE release_unit_config (
 );
 
 -- ============================================================
--- Release Product
+-- Release Packages & RU Mapping
+-- (release_product_info removed; its data folded into release_packages)
 -- ============================================================
 
-CREATE TABLE release_product_info (
-    rp_id                      VARCHAR2(64)   NOT NULL,
-    rp_name                    VARCHAR2(255)  NOT NULL,
-    rp_description             VARCHAR2(1024) DEFAULT NULL,
+CREATE TABLE release_packages (
+    package_id                 VARCHAR2(64)   NOT NULL,
+    prod_id                    VARCHAR2(64)   DEFAULT NULL,
+    name                       VARCHAR2(255)  NOT NULL,
+    description                VARCHAR2(1024) DEFAULT NULL,
+    acronym                    VARCHAR2(128)  DEFAULT NULL,
+    ap_level                   VARCHAR2(128)  DEFAULT NULL,
+    owner                      CLOB           DEFAULT NULL,
+    cd_details                 CLOB           DEFAULT NULL,
+    old_rp_id                  VARCHAR2(64)   DEFAULT NULL,
+    change_level               VARCHAR2(128)  DEFAULT NULL,
+    version                    NUMBER(10)     DEFAULT NULL,
+    is_deleted                 NUMBER(1)      DEFAULT 0 NOT NULL,
     created_at                 TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
     updated_at                 TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
-    CONSTRAINT pk_release_product_info PRIMARY KEY (rp_id)
+    CONSTRAINT pk_release_packages PRIMARY KEY (package_id),
+    CONSTRAINT fk_release_packages_product
+        FOREIGN KEY (prod_id) REFERENCES product_info (prod_id)
+        ON DELETE SET NULL
 );
-
--- ============================================================
--- Deployment & Mapping
--- ============================================================
 
 CREATE TABLE rp_map (
     ru_id                      VARCHAR2(64)   NOT NULL,
@@ -141,10 +150,29 @@ CREATE TABLE rp_map (
     CONSTRAINT fk_rp_map_release_unit
         FOREIGN KEY (ru_id) REFERENCES release_unit_info (ap_id)
         ON DELETE CASCADE,
-    CONSTRAINT fk_rp_map_release_product
-        FOREIGN KEY (rp_id) REFERENCES release_product_info (rp_id)
+    CONSTRAINT fk_rp_map_release_package
+        FOREIGN KEY (rp_id) REFERENCES release_packages (package_id)
         ON DELETE CASCADE
 );
+
+CREATE TABLE rp_ru_mapping (
+    release_package_id         VARCHAR2(64)   NOT NULL,
+    release_unit_id            VARCHAR2(64)   NOT NULL,
+    is_deleted                 NUMBER(1)      DEFAULT 0 NOT NULL,
+    created_at                 TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
+    updated_at                 TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
+    CONSTRAINT pk_rp_ru_mapping PRIMARY KEY (release_package_id, release_unit_id),
+    CONSTRAINT fk_rp_ru_mapping_package
+        FOREIGN KEY (release_package_id) REFERENCES release_packages (package_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_rp_ru_mapping_release_unit
+        FOREIGN KEY (release_unit_id) REFERENCES release_unit_info (ap_id)
+        ON DELETE CASCADE
+);
+
+-- ============================================================
+-- Deployment
+-- ============================================================
 
 CREATE TABLE paas_deploy_unit (
     unit_id                    VARCHAR2(64)   NOT NULL,
@@ -187,33 +215,6 @@ CREATE TABLE paas_rlse_info (
     updated_at                 TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
     CONSTRAINT pk_paas_rlse_info PRIMARY KEY (rlse_id),
     CONSTRAINT fk_paas_rlse_release_unit
-        FOREIGN KEY (ap_id) REFERENCES release_unit_info (ap_id)
-        ON DELETE CASCADE
-);
-
--- ============================================================
--- Release Packages & RU Mapping
--- ============================================================
-
-CREATE TABLE release_packages (
-    package_id                 VARCHAR2(64)   NOT NULL,
-    package_name               VARCHAR2(255)  NOT NULL,
-    package_description        VARCHAR2(1024) DEFAULT NULL,
-    created_at                 TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
-    updated_at                 TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
-    CONSTRAINT pk_release_packages PRIMARY KEY (package_id)
-);
-
-CREATE TABLE rp_ru_mapping (
-    package_id                 VARCHAR2(64)   NOT NULL,
-    ap_id                      VARCHAR2(64)   NOT NULL,
-    created_at                 TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
-    updated_at                 TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
-    CONSTRAINT pk_rp_ru_mapping PRIMARY KEY (package_id, ap_id),
-    CONSTRAINT fk_rp_ru_mapping_package
-        FOREIGN KEY (package_id) REFERENCES release_packages (package_id)
-        ON DELETE CASCADE,
-    CONSTRAINT fk_rp_ru_mapping_release_unit
         FOREIGN KEY (ap_id) REFERENCES release_unit_info (ap_id)
         ON DELETE CASCADE
 );

@@ -621,111 +621,113 @@ func migrateReleaseUnits(oracle, maria *sql.DB, step int) error {
 	return nil
 }
 
-// migrateReleaseGroups loads both Oracle source tables into the single MariaDB
-// release_group table: release_product_info (group_type='product') and
-// release_packages (group_type='package').
+// migrateReleaseGroups loads Oracle release_packages into the MariaDB release_group
+// table. release_product_info has been removed from Oracle; its data was folded
+// into release_packages (old_rp_id stores the legacy reference).
 func migrateReleaseGroups(oracle, maria *sql.DB, step int) error {
-	type sourceSpec struct {
-		logKey    string
-		query     string
-		groupType string
+	const logKey = "release_packages"
+
+	entry, err := checkLog(maria, logKey)
+	if err != nil {
+		return err
 	}
-	sources := []sourceSpec{
-		{
-			logKey: "release_product_info",
-			query: `SELECT rp_id, rp_name, rp_description, created_at, updated_at
-			        FROM release_product_info ORDER BY rp_id
-			        OFFSET :1 ROWS FETCH NEXT :2 ROWS ONLY`,
-			groupType: "product",
-		},
-		{
-			logKey: "release_packages",
-			query: `SELECT package_id, package_name, package_description, created_at, updated_at
-			        FROM release_packages ORDER BY package_id
-			        OFFSET :1 ROWS FETCH NEXT :2 ROWS ONLY`,
-			groupType: "package",
-		},
+	if entry.status == "completed" {
+		fmt.Printf("[%d/8] release_group: SKIP (already completed)\n", step)
+		return nil
 	}
 
-	for _, src := range sources {
-		entry, err := checkLog(maria, src.logKey)
+	offset := entry.lastOffset
+	total := entry.rowsMigrated
+	if offset > 0 {
+		fmt.Printf("[%d/8] release_group: resuming from offset %d\n", step, offset)
+	}
+
+	for {
+		rows, err := oracle.Query(`
+			SELECT package_id, prod_id, name, description,
+			       acronym, ap_level, owner, cd_details,
+			       old_rp_id, change_level, version, is_deleted,
+			       created_at, updated_at
+			FROM release_packages
+			ORDER BY package_id
+			OFFSET :1 ROWS FETCH NEXT :2 ROWS ONLY`,
+			offset, batchSize)
 		if err != nil {
+			return fmt.Errorf("release_group query: %w", err)
+		}
+
+		type rgRow struct {
+			id                   string
+			prodID               sql.NullString
+			name                 string
+			description          sql.NullString
+			acronym, apLevel     sql.NullString
+			owner, cdDetails     sql.NullString
+			oldRpID, changeLevel sql.NullString
+			version              sql.NullInt64
+			isDeleted            int64
+			createdAt, updatedAt time.Time
+		}
+		var batch []rgRow
+		for rows.Next() {
+			var r rgRow
+			if err := rows.Scan(
+				&r.id, &r.prodID, &r.name, &r.description,
+				&r.acronym, &r.apLevel, &r.owner, &r.cdDetails,
+				&r.oldRpID, &r.changeLevel, &r.version, &r.isDeleted,
+				&r.createdAt, &r.updatedAt,
+			); err != nil {
+				rows.Close()
+				return fmt.Errorf("release_group scan: %w", err)
+			}
+			batch = append(batch, r)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
 			return err
 		}
-		if entry.status == "completed" {
-			fmt.Printf("[%d/8] release_group (%s): SKIP (already completed)\n", step, src.logKey)
-			continue
+		if len(batch) == 0 {
+			break
 		}
 
-		offset := entry.lastOffset
-		total := entry.rowsMigrated
-		if offset > 0 {
-			fmt.Printf("[%d/8] release_group (%s): resuming from offset %d\n", step, src.logKey, offset)
-		}
-
-		for {
-			rows, err := oracle.Query(src.query, offset, batchSize)
+		fmt.Printf("[%d/8] release_group: batch offset=%d rows=%d\n", step, offset, len(batch))
+		for _, r := range batch {
+			_, err := maria.Exec(`
+				INSERT IGNORE INTO release_group
+				    (group_id, prod_id, group_name, group_description,
+				     acronym, ap_level, owner, cd_details,
+				     old_rp_id, change_level, version, is_deleted,
+				     created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				r.id, r.prodID, r.name, r.description,
+				r.acronym, r.apLevel, r.owner, r.cdDetails,
+				r.oldRpID, r.changeLevel, r.version, r.isDeleted,
+				r.createdAt.UTC(), r.updatedAt.UTC())
 			if err != nil {
-				return fmt.Errorf("release_group(%s) query: %w", src.logKey, err)
-			}
-
-			type rgRow struct {
-				id, name             string
-				description          sql.NullString
-				createdAt, updatedAt time.Time
-			}
-			var batch []rgRow
-			for rows.Next() {
-				var r rgRow
-				if err := rows.Scan(&r.id, &r.name, &r.description,
-					&r.createdAt, &r.updatedAt); err != nil {
-					rows.Close()
-					return fmt.Errorf("release_group(%s) scan: %w", src.logKey, err)
-				}
-				batch = append(batch, r)
-			}
-			rows.Close()
-			if err := rows.Err(); err != nil {
-				return err
-			}
-			if len(batch) == 0 {
-				break
-			}
-
-			fmt.Printf("[%d/8] release_group (%s): batch offset=%d rows=%d\n",
-				step, src.logKey, offset, len(batch))
-			for _, r := range batch {
-				_, err := maria.Exec(`
-					INSERT IGNORE INTO release_group
-					    (group_id, group_type, group_name, group_description, created_at, updated_at)
-					VALUES (?, ?, ?, ?, ?, ?)`,
-					r.id, src.groupType, r.name, r.description,
-					r.createdAt.UTC(), r.updatedAt.UTC())
-				if err != nil {
-					return fmt.Errorf("release_group(%s) insert: %w", src.logKey, err)
-				}
-			}
-
-			total += len(batch)
-			offset += len(batch)
-			if err := updateLog(maria, src.logKey, offset, total); err != nil {
-				return err
-			}
-			if len(batch) < batchSize {
-				break
+				return fmt.Errorf("release_group insert: %w", err)
 			}
 		}
 
-		if err := markCompleted(maria, src.logKey, total); err != nil {
+		total += len(batch)
+		offset += len(batch)
+		if err := updateLog(maria, logKey, offset, total); err != nil {
 			return err
 		}
-		fmt.Printf("[%d/8] release_group (%s): done (%d total rows)\n", step, src.logKey, total)
+		if len(batch) < batchSize {
+			break
+		}
 	}
+
+	if err := markCompleted(maria, logKey, total); err != nil {
+		return err
+	}
+	fmt.Printf("[%d/8] release_group: done (%d total rows)\n", step, total)
 	return nil
 }
 
 // migrateReleaseGroupRUMap loads rp_map (rp_id→group_id, ru_id→ap_id) and
-// rp_ru_mapping (package_id→group_id, ap_id) into release_group_ru_map.
+// rp_ru_mapping (release_package_id→group_id, release_unit_id→ap_id) into
+// release_group_ru_map. Both Oracle tables now reference release_packages.
 func migrateReleaseGroupRUMap(oracle, maria *sql.DB, step int) error {
 	type sourceSpec struct {
 		logKey string
@@ -742,9 +744,9 @@ func migrateReleaseGroupRUMap(oracle, maria *sql.DB, step int) error {
 		},
 		{
 			logKey: "rp_ru_mapping",
-			// package_id → group_id, ap_id stays
-			query: `SELECT package_id, ap_id, created_at, updated_at
-			        FROM rp_ru_mapping ORDER BY package_id, ap_id
+			// release_package_id → group_id, release_unit_id → ap_id
+			query: `SELECT release_package_id, release_unit_id, created_at, updated_at
+			        FROM rp_ru_mapping ORDER BY release_package_id, release_unit_id
 			        OFFSET :1 ROWS FETCH NEXT :2 ROWS ONLY`,
 		},
 	}

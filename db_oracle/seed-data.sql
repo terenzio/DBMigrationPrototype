@@ -1,4 +1,4 @@
--- Sample seed data for all 14 tables
+-- Sample seed data for all 13 tables
 -- Runs after schema-oracle.sql to populate tables with 2 rows each
 
 ALTER SESSION SET CONTAINER = XEPDB1;
@@ -75,21 +75,22 @@ INSERT INTO release_unit_config (ap_config_id, ap_id, ap_config_param, ap_config
 VALUES ('ruc-002', 'ru-002', 'deploy_target', 'docker-compose');
 
 -- ============================================================
--- Release Products
+-- Release Packages
+-- (replaces release_product_info; old_rp_id stores legacy rp_id for traceability)
 -- ============================================================
 
-INSERT INTO release_product_info (rp_id, rp_name, rp_description)
-VALUES ('rp-001', 'Cloud Platform v2.0', 'Major release with API Gateway improvements');
+INSERT INTO release_packages (package_id, prod_id, name, description, acronym, ap_level, old_rp_id, change_level, version, is_deleted)
+VALUES ('pkg-001', 'prod-001', 'Cloud Platform v2.0', 'Major release with API Gateway improvements', 'CPv2', 'L1', 'rp-001', 'major', 2, 0);
 
-INSERT INTO release_product_info (rp_id, rp_name, rp_description)
-VALUES ('rp-002', 'Data Analytics v1.5', 'Minor release with pipeline optimizations');
+INSERT INTO release_packages (package_id, prod_id, name, description, acronym, ap_level, old_rp_id, change_level, version, is_deleted)
+VALUES ('pkg-002', 'prod-002', 'Data Analytics v1.5', 'Minor release with pipeline optimizations', 'DAv1', 'L2', 'rp-002', 'minor', 1, 0);
 
 -- ============================================================
--- RP Map (Release Unit <-> Release Product)
+-- RP Map (Release Unit <-> Release Package)
 -- ============================================================
 
-INSERT INTO rp_map (ru_id, rp_id) VALUES ('ru-001', 'rp-001');
-INSERT INTO rp_map (ru_id, rp_id) VALUES ('ru-002', 'rp-002');
+INSERT INTO rp_map (ru_id, rp_id) VALUES ('ru-001', 'pkg-001');
+INSERT INTO rp_map (ru_id, rp_id) VALUES ('ru-002', 'pkg-002');
 
 -- ============================================================
 -- PaaS Deploy Units
@@ -119,20 +120,10 @@ INSERT INTO paas_rlse_info (rlse_id, ap_id, rlse_name, rlse_description)
 VALUES ('rl-002', 'ru-002', 'Pipeline Release 1.5.0', 'New Kafka connector support');
 
 -- ============================================================
--- Release Packages
--- ============================================================
-
-INSERT INTO release_packages (package_id, package_name, package_description)
-VALUES ('pkg-001', 'cloud-platform-bundle', 'Full Cloud Platform deployment package');
-
-INSERT INTO release_packages (package_id, package_name, package_description)
-VALUES ('pkg-002', 'data-analytics-bundle', 'Full Data Analytics deployment package');
-
--- ============================================================
 -- RP-RU Mapping (Release Package <-> Release Unit)
 -- ============================================================
 
-INSERT INTO rp_ru_mapping (package_id, ap_id) VALUES ('pkg-001', 'ru-001');
-INSERT INTO rp_ru_mapping (package_id, ap_id) VALUES ('pkg-002', 'ru-002');
+INSERT INTO rp_ru_mapping (release_package_id, release_unit_id, is_deleted) VALUES ('pkg-001', 'ru-001', 0);
+INSERT INTO rp_ru_mapping (release_package_id, release_unit_id, is_deleted) VALUES ('pkg-002', 'ru-002', 0);
 
 COMMIT;

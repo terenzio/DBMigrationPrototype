@@ -396,6 +396,35 @@ Because the entire EAV table is small relative to the parent table (typically te
 parent, not millions of rows overall), the script loads each EAV table fully into memory as a
 `map[parentID]map[paramName]paramValue` before the batched loop over the parent table begins.
 
+```mermaid
+flowchart TB
+  R["result<br/>map(string -> map(string -> string))"]
+
+  FK_A["fk: FK_A"]
+  FK_B["fk: FK_B"]
+
+  M_A["inner map<br/>map(string -> string)"]
+  M_B["inner map<br/>map(string -> string)"]
+
+  A_timeout["param: timeout<br/>val: 30"]
+  A_region["param: region<br/>val: ap-northeast-1"]
+  A_enabled["param: enabled<br/>val: true"]
+
+  B_timeout["param: timeout<br/>val: 10"]
+  B_enabled["param: enabled<br/>val: empty string<br/>(NULL -> empty)"]
+
+  R --> FK_A --> M_A
+  R --> FK_B --> M_B
+
+  M_A --> A_timeout
+  M_A --> A_region
+  M_A --> A_enabled
+
+  M_B --> B_timeout
+  M_B --> B_enabled
+```
+
+
 ```
 Oracle: product_suite_config
   (suite-A, timeout, 30)

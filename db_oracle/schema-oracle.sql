@@ -12,23 +12,27 @@ ALTER SESSION SET CURRENT_SCHEMA = SYSTEM;
 -- ============================================================
 
 CREATE TABLE product_suites_info (
-    prod_suite_id              VARCHAR2(64)   NOT NULL,
-    prod_suite_name            VARCHAR2(255)  NOT NULL,
-    prod_suite_owner_nt_acct   VARCHAR2(128)  DEFAULT NULL,
-    prod_suite_site_owner_acct VARCHAR2(128)  DEFAULT NULL,
-    division                   VARCHAR2(128)  DEFAULT NULL,
+    prod_suite_id              NUMBER   NOT NULL,
+    prod_suite_name            VARCHAR2(99)  NOT NULL,
+    prod_suite_owner_nt_acct   VARCHAR2(999)  DEFAULT NULL,
+    prod_suite_site_owner_acct VARCHAR2(20)  DEFAULT NULL,
+    division                   VARCHAR2(20)  DEFAULT NULL,
     created_at                 TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
     updated_at                 TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
     CONSTRAINT pk_product_suites_info PRIMARY KEY (prod_suite_id)
 );
+CREATE UNIQUE INDEX pk_pp_product_suites_info ON product_suites_info (prod_suite_id);
 
 CREATE TABLE product_suite_config (
-    prod_suite_config_id       VARCHAR2(64)   NOT NULL,
-    prod_suite_id              VARCHAR2(64)   NOT NULL,
-    prod_suite_config_param    VARCHAR2(255)  NOT NULL,
-    prod_suite_config_val      VARCHAR2(1024) DEFAULT NULL,
+    prod_suite_id              NUMBER(10,0)   NOT NULL,
+    prod_suite_config_val      VARCHAR2(99) DEFAULT NULL,
+    prod_suite_config_param    VARCHAR2(99)  NOT NULL,
+    prod_suite_config_id       VARCHAR2(36)   NOT NULL,
+
+    
     created_at                 TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
     updated_at                 TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
+    
     CONSTRAINT pk_product_suite_config PRIMARY KEY (prod_suite_config_id),
     CONSTRAINT fk_suite_config_suite
         FOREIGN KEY (prod_suite_id) REFERENCES product_suites_info (prod_suite_id)
@@ -44,7 +48,7 @@ CREATE TABLE product_info (
     prod_name                  VARCHAR2(255)  NOT NULL,
     prod_short_name            VARCHAR2(64)   DEFAULT NULL,
     mgr_nt_acct                VARCHAR2(128)  DEFAULT NULL,
-    prod_owner_nt_acct         VARCHAR2(128)  DEFAULT NULL,
+    prod_owner_nt_acct         VARCHAR2(128)  DEFAULT NULL, 
     prod_plat_name             VARCHAR2(255)  DEFAULT NULL,
     prod_name_alias            VARCHAR2(255)  DEFAULT NULL,
     prod_suite_id              VARCHAR2(64)   NOT NULL,
